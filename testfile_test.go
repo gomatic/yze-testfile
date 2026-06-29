@@ -59,6 +59,6 @@ func TestRunReportsOrphanUnitTestFiles(t *testing.T) {
 
 func TestRegistrationIsWellFormed(t *testing.T) {
 	assert.NoError(t, Registration.Validate())
-	assert.Equal(t, "yze/go/testfile", Registration.RuleID())
+	assert.Equal(t, "yze/testfile", Registration.RuleID())
 	assert.Same(t, Analyzer, Registration.Analyzer)
 }

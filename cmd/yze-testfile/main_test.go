@@ -3,10 +3,11 @@ package main
 import (
 	"testing"
 
-	testfile "github.com/gomatic/yze-go-testfile"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/tools/go/analysis"
+
+	testfile "github.com/gomatic/yze-testfile"
 )
 
 func TestMainRunsTheAnalyzer(t *testing.T) {
