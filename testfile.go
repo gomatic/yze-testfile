@@ -48,10 +48,24 @@ var Registration = goyze.Registration{
 }
 
 // run reports each orphan unit-test file in the package directory.
+//
+// A package whose only Go files are external test files (GoFiles empty,
+// XTestGoFiles non-empty — e.g. an examples directory holding only Example
+// functions) is delivered by the driver as a base-package pass with no syntax
+// files. There is no file to anchor a directory or report on, and the package's
+// test files are analyzed in their own pass; this pass is a no-op.
 func run(pass *analysis.Pass) (any, error) {
+	if len(pass.Files) == 0 {
+		return nil, nil
+	}
 	dir := filepath.Dir(pass.Fset.File(pass.Files[0].Pos()).Name())
 	for _, stem := range orphanTestStems(readDir, readFile, dir) {
-		pass.Reportf(pass.Files[0].Name.Pos(), "test file %s_test.go has no source file %s.go; unit tests must be 1:1 with their source (give integration tests a build tag, or keep only examples/benchmarks/fuzz)", stem, stem)
+		pass.Reportf(
+			pass.Files[0].Name.Pos(),
+			"test file %s_test.go has no source file %s.go; unit tests must be 1:1 with their source (give integration tests a build tag, or keep only examples/benchmarks/fuzz)",
+			stem,
+			stem,
+		)
 	}
 	return nil, nil
 }

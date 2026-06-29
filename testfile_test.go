@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/tools/go/analysis"
 	"golang.org/x/tools/go/analysis/analysistest"
 )
 
@@ -21,7 +22,16 @@ func fakeFiles(contents map[string]string) fileReader {
 }
 
 func TestOrphanTestStemsClassifiesEveryCase(t *testing.T) {
-	names := []string{"a.go", "a_test.go", "helper_test.go", "example_test.go", "integration_test.go", "legacy_test.go", "comment_test.go", "notgo.txt"}
+	names := []string{
+		"a.go",
+		"a_test.go",
+		"helper_test.go",
+		"example_test.go",
+		"integration_test.go",
+		"legacy_test.go",
+		"comment_test.go",
+		"notgo.txt",
+	}
 	dir := func(string) ([]string, error) { return names, nil }
 	file := fakeFiles(map[string]string{
 		// A unit test with no source file: the sole genuine orphan.
@@ -77,6 +87,33 @@ func TestOSReadDirNames(t *testing.T) {
 
 func TestRunReportsOrphanUnitTestFiles(t *testing.T) {
 	analysistest.Run(t, analysistest.TestData(), Analyzer, "a")
+}
+
+// TestRunSkipsPackageWithoutFiles pins the contract that a pass carrying no
+// syntax files is a no-op. The driver delivers such a pass for a package whose
+// only Go files are external test files (an examples-only directory); run must
+// not index pass.Files[0]. Without the guard this panics with index out of
+// range, which is the cmd-cat/examples crash this test exists to prevent.
+func TestRunSkipsPackageWithoutFiles(t *testing.T) {
+	result, err := run(&analysis.Pass{})
+
+	require.NoError(t, err)
+	assert.Nil(t, result)
+}
+
+// TestRunSkipsExternalTestOnlyExamplesPackage reproduces the cmd-cat/examples
+// layout end-to-end: a directory of only external test files declaring only
+// Example functions. The base package has zero syntax files; the analyzer must
+// run clean and report nothing, since every example is exempt.
+func TestRunSkipsExternalTestOnlyExamplesPackage(t *testing.T) {
+	analysistest.Run(t, analysistest.TestData(), Analyzer, "b")
+}
+
+// TestRunReportsOrphanInExternalTestOnlyPackage proves the empty-pass guard does
+// not blind detection: a genuine unit-test orphan living in a package with no
+// non-test source (delivered only via the external-test pass) is still flagged.
+func TestRunReportsOrphanInExternalTestOnlyPackage(t *testing.T) {
+	analysistest.Run(t, analysistest.TestData(), Analyzer, "c")
 }
 
 func TestRegistrationIsWellFormed(t *testing.T) {
