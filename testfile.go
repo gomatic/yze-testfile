@@ -7,6 +7,10 @@
 package testfile
 
 import (
+	"go/ast"
+	"go/build/constraint"
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
 	"slices"
@@ -39,7 +43,7 @@ var Analyzer = &analysis.Analyzer{
 var Registration = goyze.Registration{
 	Name:       "testfile",
 	Categories: []goyze.Category{"testing"},
-	URL:        "https://docs.gomatic.dev/yze/go/testfile",
+	URL:        "https://docs.gomatic.dev/yze/testfile",
 	Analyzer:   Analyzer,
 }
 
@@ -88,14 +92,59 @@ func testStem(name string) (string, bool) {
 }
 
 // exempt reports whether a test file is not a unit test: it carries a build
-// constraint, or declares no Test functions.
+// constraint (a //go:build or legacy // +build line), or declares no Test
+// functions. The file is parsed so that build-constraint lines and Test
+// function declarations are recognized structurally — never by substring, which
+// both misses the legacy // +build form and misfires on text appearing inside a
+// comment or string literal.
 func exempt(file fileReader, path string) bool {
 	content, err := file(path)
 	if err != nil {
 		return true
 	}
-	text := string(content)
-	return strings.Contains(text, "//go:build") || !strings.Contains(text, "func Test")
+	parsed, err := parser.ParseFile(token.NewFileSet(), path, content, parser.ParseComments|parser.SkipObjectResolution)
+	if err != nil {
+		return true
+	}
+	return hasBuildConstraint(parsed) || !hasTestFunc(parsed)
+}
+
+// hasBuildConstraint reports whether the file carries a build constraint, in
+// either the //go:build or the legacy // +build form, before its package clause.
+func hasBuildConstraint(f *ast.File) bool {
+	for _, group := range f.Comments {
+		if constrains(group, f.Package) {
+			return true
+		}
+	}
+	return false
+}
+
+// constrains reports whether a comment group holds a build-constraint line that
+// precedes the package clause at pkg.
+func constrains(group *ast.CommentGroup, pkg token.Pos) bool {
+	for _, c := range group.List {
+		if c.Pos() < pkg && (constraint.IsGoBuild(c.Text) || constraint.IsPlusBuild(c.Text)) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasTestFunc reports whether the file declares at least one Test function.
+func hasTestFunc(f *ast.File) bool {
+	for _, decl := range f.Decls {
+		if fn, ok := decl.(*ast.FuncDecl); ok && isTestFunc(fn) {
+			return true
+		}
+	}
+	return false
+}
+
+// isTestFunc reports whether a declaration is a top-level Test function (a
+// TestXxx free function, not a method).
+func isTestFunc(fn *ast.FuncDecl) bool {
+	return fn.Recv == nil && strings.HasPrefix(fn.Name.Name, "Test")
 }
 
 // osReadDirNames lists the file names in a directory.
