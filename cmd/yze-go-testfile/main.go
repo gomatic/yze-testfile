@@ -1,11 +1,11 @@
-// Command yze-testfile runs the testfile analyzer as a standalone go/analysis
+// Command yze-go-testfile runs the testfile analyzer as a standalone go/analysis
 // checker (text and -json output, and as a `go vet -vettool`).
 package main
 
 import (
 	"golang.org/x/tools/go/analysis/singlechecker"
 
-	testfile "github.com/gomatic/yze-testfile"
+	testfile "github.com/gomatic/yze-go-testfile"
 )
 
 // run is the analysis entry point, indirected so the binary's wiring is testable

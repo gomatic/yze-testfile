@@ -1,4 +1,4 @@
-module github.com/gomatic/yze-testfile
+module github.com/gomatic/yze-go-testfile
 
 go 1.26.4
 
