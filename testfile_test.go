@@ -32,7 +32,7 @@ func TestOrphanTestStemsClassifiesEveryCase(t *testing.T) {
 		"comment_test.go",
 		"notgo.txt",
 	}
-	dir := func(string) ([]string, error) { return names, nil }
+	dir := func(dirPath) ([]string, error) { return names, nil }
 	file := fakeFiles(map[string]string{
 		// A unit test with no source file: the sole genuine orphan.
 		"d/helper_test.go": "package a\nimport \"testing\"\nfunc TestHelper(t *testing.T) {}",
@@ -55,7 +55,7 @@ func TestOrphanTestStemsClassifiesEveryCase(t *testing.T) {
 }
 
 func TestOrphanTestStemsReturnsNilOnReadError(t *testing.T) {
-	dir := func(string) ([]string, error) { return nil, errors.New("unreadable") }
+	dir := func(dirPath) ([]string, error) { return nil, errors.New("unreadable") }
 
 	assert.Nil(t, orphanTestStems(dir, fakeFiles(nil), "d"))
 }

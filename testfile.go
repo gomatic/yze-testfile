@@ -23,7 +23,7 @@ import (
 // Injected filesystem operations, so the analyzer's error and decision paths are
 // testable without a real directory tree.
 type (
-	dirReader  func(dir string) ([]string, error)
+	dirReader  func(dir dirPath) ([]string, error)
 	fileReader func(path string) ([]byte, error)
 )
 
@@ -75,13 +75,13 @@ type dirPath string
 
 // orphanTestStems returns the stems of unit-test files lacking a source file.
 func orphanTestStems(dir dirReader, file fileReader, path dirPath) []string {
-	names, err := dir(string(path))
+	names, err := dir(path)
 	if err != nil {
 		return nil
 	}
 	var stems []string
 	for _, name := range names {
-		if stem, ok := orphan(file, string(path), name, names); ok {
+		if stem, ok := orphan(file, path, fileName(name), names); ok {
 			stems = append(stems, stem)
 		}
 	}
@@ -89,12 +89,12 @@ func orphanTestStems(dir dirReader, file fileReader, path dirPath) []string {
 }
 
 // orphan reports a test file's stem when it is a unit test with no source file.
-func orphan(file fileReader, dir, name string, names []string) (string, bool) {
-	stem, ok := testStem(fileName(name))
+func orphan(file fileReader, dir dirPath, name fileName, names []string) (string, bool) {
+	stem, ok := testStem(name)
 	if !ok || slices.Contains(names, stem+".go") {
 		return "", false
 	}
-	if exempt(file, filePath(filepath.Join(dir, name))) {
+	if exempt(file, filePath(filepath.Join(string(dir), string(name)))) {
 		return "", false
 	}
 	return stem, true
@@ -176,8 +176,8 @@ func isTestFunc(fn *ast.FuncDecl) bool {
 }
 
 // osReadDirNames lists the file names in a directory.
-func osReadDirNames(dir string) ([]string, error) {
-	entries, err := os.ReadDir(dir)
+func osReadDirNames(dir dirPath) ([]string, error) {
+	entries, err := os.ReadDir(string(dir))
 	if err != nil {
 		return nil, err
 	}
