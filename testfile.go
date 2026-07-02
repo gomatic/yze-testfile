@@ -59,7 +59,7 @@ func run(pass *analysis.Pass) (any, error) {
 		return nil, nil
 	}
 	dir := filepath.Dir(pass.Fset.File(pass.Files[0].Pos()).Name())
-	for _, stem := range orphanTestStems(readDir, readFile, pathParam(dir)) {
+	for _, stem := range orphanTestStems(readDir, readFile, dirPath(dir)) {
 		pass.Reportf(
 			pass.Files[0].Name.Pos(),
 			"test file %s_test.go has no source file %s.go; unit tests must be 1:1 with their source (give integration tests a build tag, or keep only examples/benchmarks/fuzz)",
@@ -70,11 +70,11 @@ func run(pass *analysis.Pass) (any, error) {
 	return nil, nil
 }
 
-// pathParam names the path parameter of orphanTestStems; rename it to the real domain concept.
-type pathParam string
+// dirPath is the filesystem path of the analyzed package's directory.
+type dirPath string
 
 // orphanTestStems returns the stems of unit-test files lacking a source file.
-func orphanTestStems(dir dirReader, file fileReader, path pathParam) []string {
+func orphanTestStems(dir dirReader, file fileReader, path dirPath) []string {
 	names, err := dir(string(path))
 	if err != nil {
 		return nil
@@ -90,26 +90,29 @@ func orphanTestStems(dir dirReader, file fileReader, path pathParam) []string {
 
 // orphan reports a test file's stem when it is a unit test with no source file.
 func orphan(file fileReader, dir, name string, names []string) (string, bool) {
-	stem, ok := testStem(nameParam(name))
+	stem, ok := testStem(fileName(name))
 	if !ok || slices.Contains(names, stem+".go") {
 		return "", false
 	}
-	if exempt(file, pathParam(filepath.Join(dir, name))) {
+	if exempt(file, filePath(filepath.Join(dir, name))) {
 		return "", false
 	}
 	return stem, true
 }
 
-// nameParam names the name parameter of testStem; rename it to the real domain concept.
-type nameParam string
+// fileName is a bare file name within the package directory.
+type fileName string
 
 // testStem returns the stem of a _test.go file name.
-func testStem(name nameParam) (string, bool) {
+func testStem(name fileName) (string, bool) {
 	if !strings.HasSuffix(string(name), "_test.go") {
 		return "", false
 	}
 	return strings.TrimSuffix(string(name), "_test.go"), true
 }
+
+// filePath is the filesystem path of a test file under exemption inspection.
+type filePath string
 
 // exempt reports whether a test file is not a unit test: it carries a build
 // constraint (a //go:build or legacy // +build line), or declares no Test
@@ -117,7 +120,7 @@ func testStem(name nameParam) (string, bool) {
 // function declarations are recognized structurally — never by substring, which
 // both misses the legacy // +build form and misfires on text appearing inside a
 // comment or string literal.
-func exempt(file fileReader, path pathParam) bool {
+func exempt(file fileReader, path filePath) bool {
 	content, err := file(string(path))
 	if err != nil {
 		return true
