@@ -59,7 +59,7 @@ func run(pass *analysis.Pass) (any, error) {
 		return nil, nil
 	}
 	dir := filepath.Dir(pass.Fset.File(pass.Files[0].Pos()).Name())
-	for _, stem := range orphanTestStems(readDir, readFile, dir) {
+	for _, stem := range orphanTestStems(readDir, readFile, pathParam(dir)) {
 		pass.Reportf(
 			pass.Files[0].Name.Pos(),
 			"test file %s_test.go has no source file %s.go; unit tests must be 1:1 with their source (give integration tests a build tag, or keep only examples/benchmarks/fuzz)",
@@ -70,15 +70,18 @@ func run(pass *analysis.Pass) (any, error) {
 	return nil, nil
 }
 
+// pathParam names the path parameter of orphanTestStems; rename it to the real domain concept.
+type pathParam string
+
 // orphanTestStems returns the stems of unit-test files lacking a source file.
-func orphanTestStems(dir dirReader, file fileReader, path string) []string {
-	names, err := dir(path)
+func orphanTestStems(dir dirReader, file fileReader, path pathParam) []string {
+	names, err := dir(string(path))
 	if err != nil {
 		return nil
 	}
 	var stems []string
 	for _, name := range names {
-		if stem, ok := orphan(file, path, name, names); ok {
+		if stem, ok := orphan(file, string(path), name, names); ok {
 			stems = append(stems, stem)
 		}
 	}
@@ -87,22 +90,25 @@ func orphanTestStems(dir dirReader, file fileReader, path string) []string {
 
 // orphan reports a test file's stem when it is a unit test with no source file.
 func orphan(file fileReader, dir, name string, names []string) (string, bool) {
-	stem, ok := testStem(name)
+	stem, ok := testStem(nameParam(name))
 	if !ok || slices.Contains(names, stem+".go") {
 		return "", false
 	}
-	if exempt(file, filepath.Join(dir, name)) {
+	if exempt(file, pathParam(filepath.Join(dir, name))) {
 		return "", false
 	}
 	return stem, true
 }
 
+// nameParam names the name parameter of testStem; rename it to the real domain concept.
+type nameParam string
+
 // testStem returns the stem of a _test.go file name.
-func testStem(name string) (string, bool) {
-	if !strings.HasSuffix(name, "_test.go") {
+func testStem(name nameParam) (string, bool) {
+	if !strings.HasSuffix(string(name), "_test.go") {
 		return "", false
 	}
-	return strings.TrimSuffix(name, "_test.go"), true
+	return strings.TrimSuffix(string(name), "_test.go"), true
 }
 
 // exempt reports whether a test file is not a unit test: it carries a build
@@ -111,12 +117,17 @@ func testStem(name string) (string, bool) {
 // function declarations are recognized structurally — never by substring, which
 // both misses the legacy // +build form and misfires on text appearing inside a
 // comment or string literal.
-func exempt(file fileReader, path string) bool {
-	content, err := file(path)
+func exempt(file fileReader, path pathParam) bool {
+	content, err := file(string(path))
 	if err != nil {
 		return true
 	}
-	parsed, err := parser.ParseFile(token.NewFileSet(), path, content, parser.ParseComments|parser.SkipObjectResolution)
+	parsed, err := parser.ParseFile(
+		token.NewFileSet(),
+		string(path),
+		content,
+		parser.ParseComments|parser.SkipObjectResolution,
+	)
 	if err != nil {
 		return true
 	}
